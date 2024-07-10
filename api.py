@@ -61,6 +61,7 @@ class Api:
         self.selectedTicket = 0
         self.ntp_client = ntplib.NTPClient()
         self.validatePhoneNum = str(phone) if phone else str()
+        self.date = "2000-01-01"
         # ALL_USER_DATA_LIST = [""]
 
     def load_cookie(self):
@@ -137,8 +138,17 @@ class Api:
         # print(self.menu("GET_ORDER_IF",data["data"]))
         self.setAuthType(data)
 
+        if data["data"]["sales_dates"]:
+            self.menu("GET_DATE",data["data"])
+            url = "https://show.bilibili.com/api/ticket/project/infoByDate?id="+self.user_data["project_id"] +"&date=" +self.date
+            data = self._http(url,True)
+            self.user_data["screen_id"],self.user_data["sku_id"],self.user_data["pay_money"],self.userCountLimit = self.menu("GET_ORDER_IF_DATE",data["data"])
         # print(self.user_data["auth_type"])
-        self.user_data["screen_id"],self.user_data["sku_id"],self.user_data["pay_money"],self.userCountLimit = self.menu("GET_ORDER_IF",data["data"])
+        else:
+            self.user_data["screen_id"],self.user_data["sku_id"],self.user_data["pay_money"],self.userCountLimit = self.menu("GET_ORDER_IF",data["data"])
+
+        url = "https://show.bilibili.com/api/ticket/project/getV2?version=134&id=" + self.user_data["project_id"] + "&project_id="+ self.user_data["project_id"] + "&requestSource=pc-new"
+        data = self._http(url,True)
         if(data["data"]["has_paper_ticket"]):
             a = self.addressInfo()
             fa = a["prov"]+a["city"]+a["area"]+a["addr"]
@@ -536,6 +546,45 @@ class Api:
             if "bilibili" not in i or "id" not in i:
                 self.error_handle("网址格式错误")
             return i
+        elif mtype == "GET_DATE":
+            print("\n请选择日期序号并按回车继续，格式例如 1")
+            for i in range(len(data["sales_dates"])):
+                print(str(i+1)+":"+data["sales_dates"][i]["date"])
+            date = input("日期序号 >>> ").strip()
+            try:
+                date = int(date) - 1
+                if date not in [i for i in range(len(data["sales_dates"][i]["date"]))]:
+                    self.error_handle("请输入正确序号")
+            except:
+                self.error_handle("请输入正确数字")
+            self.date=data["sales_dates"][date]["date"]
+        elif mtype =="GET_ORDER_IF_DATE":
+            print("\n请选择场次序号并按回车继续，格式例如 1")
+            for i in range(len(data["screen_list"])):
+                print(str(i+1) + ":",data["screen_list"][i]["name"])
+            date = input("场次序号 >>> ").strip()
+            try:
+                date = int(date) - 1
+                if date not in [i for i in range(len(data["screen_list"]))]:
+                    self.error_handle("请输入正确序号")
+            except:
+                self.error_handle("请输入正确数字")
+            print("已选择：", data["screen_list"][date]["name"])
+            print("\n请输入票种并按回车继续，格式例如 1")
+            for i in range(len(data["screen_list"][date]["ticket_list"])):
+                print(str(i+1) + ":",data["screen_list"][date]["ticket_list"][i]["desc"],"-",data["screen_list"][date]["ticket_list"][i]["price"]//100,"RMB")
+            choice = input("票种序号 >>> ").strip()
+            try:
+                choice = int(choice) - 1
+                if choice not in [i for i in range(len(data["screen_list"][date]["ticket_list"]))]:
+                    self.error_handle("请输入正确序号")
+            except:
+                self.error_handle("请输入正确数字")
+            self.selectedTicketInfo = self.date+" "+data["screen_list"][date]["name"] + " " + data["screen_list"][date]["ticket_list"][choice]["desc"]+ " " + str(data["screen_list"][date]["ticket_list"][choice]["price"]//100)+ " " +"CNY"
+            print("\n已选择：", self.selectedTicketInfo)
+            self.selectedScreen = date
+            self.selectedTicket = choice
+            return data["screen_list"][date]["id"],data["screen_list"][date]["ticket_list"][choice]["id"],data["screen_list"][date]["ticket_list"][choice]["price"],data["screen_list"][date]["ticket_list"][choice]["static_limit"]["num"]
         elif mtype == "GET_ORDER_IF":
             print("\n演出名称: " + data["name"])
             print("票务状态: " + data["sale_flag"])

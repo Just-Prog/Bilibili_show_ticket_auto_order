@@ -5,8 +5,8 @@ from geetest import dealCode
 
 if not os.path.exists("config.txt"):
 	print("config.txt文件缺失")
-	os.system("pause")
-	sys.exit(0)
+	input("按下Enter / Return键继续……")
+	os._exit(0)
 
 a = open("config.txt","r").readlines()
 proxies = None if a[0].split("=")[1].strip() == "None" else a[0].split("=")[1].strip()

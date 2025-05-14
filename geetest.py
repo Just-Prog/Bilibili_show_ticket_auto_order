@@ -15,8 +15,8 @@ class dealCode():
 	def load_cookies(self):
 		if not os.path.exists("user_data.json"):
 			print("未找到用户数据文件")
-			os.system("pause")
-			exit()
+			input("按下Enter / Return键继续……")
+			os._exit()
 		with open("user_data.json","r") as r:
 			try:
 				data = json.load(r)
@@ -62,7 +62,7 @@ class dealCode():
 			sleep(0.25)
 			if not os.path.exists("url"):
 				print("请在脚本目录打开此程序")
-				os.system("pause")
+				input("按下Enter / Return键继续……")
 			a = open("url","r")
 			u = a.read()
 			a.close()

@@ -56,9 +56,9 @@ for i in range(1,180):
     if(qr_ckjson["data"]["code"]!=0):
         if(qr_ckjson["data"]["code"]==86038):
             print("二维码已失效。")
-            os.system("pause")
+            input("按下Enter / Return键继续……")
             os.remove('bili_login.png')
-            sys.exit(0)
+            os._exit(0)
     else:
         uid = qr_check.cookies["DedeUserID"]
         userName = qr_check.cookies["DedeUserID"]
@@ -76,5 +76,5 @@ with open('user_data.json','w') as f:
 
 print("获取完毕.")
 os.remove('bili_login.png')
-os.system("pause")
+input("按下Enter / Return键继续……")
 

@@ -16,6 +16,7 @@ from time import sleep
 from urllib import request
 from urllib.request import Request as Reqtype
 from urllib.parse import urlencode
+import requests
 from plyer import notification as trayNotify
 
 
@@ -28,7 +29,7 @@ class Api:
         self.proxies=proxies
         self.specificID=specificID
         self.headers = {
-            "Content-Type": "application/json",
+            # "Content-Type": "application/json",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
             "Referer":"https://show.bilibili.com/",
             "Origin":"https://show.bilibili.com/",
@@ -90,32 +91,43 @@ class Api:
         print("您登录的账号UID为: ",self.user_data["username"])
 
             
-    def _http(self,url,j=False,data=None,raw=False):
+    def _http(self,url,j=False,data=None,raw=False,json_data=None):
         data = data.encode() if type(data) == type("") else data
         try:
             if self.proxies and data:
-                opener = request.build_opener(request.ProxyHandler({'http':self.proxies,'https':self.proxies}))
-                res = opener.open(Reqtype(url,headers=self.headers,method="POST",data=data),timeout=120)
+                # opener = request.build_opener(request.ProxyHandler({'http':self.proxies,'https':self.proxies}))
+                # res = opener.open(Reqtype(url,headers=self.headers,method="POST",data=data),timeout=120)
+                res = requests.post(url,headers=self.headers,data=data,proxies={'http':self.proxies,'https':self.proxies},timeout=120)
+            elif self.proxies and json_data:
+                # opener = request.build_opener(request.ProxyHandler({'http':self.proxies,'https':self.proxies}))
+                # res = opener.open(Reqtype(url,headers=self.headers,method="POST",json=json),timeout=120)
+                res = requests.post(url,headers=self.headers,json=json_data,proxies={'http':self.proxies,'https':self.proxies},timeout=120)
             elif self.proxies and not data:
-                opener = request.build_opener(request.ProxyHandler({'http':self.proxies,'https':self.proxies}))
-                res = opener.open(Reqtype(url,headers=self.headers,method="GET"),timeout=120)
+                # opener = request.build_opener(request.ProxyHandler({'http':self.proxies,'https':self.proxies}))
+                # res = opener.open(Reqtype(url,headers=self.headers,method="GET"),timeout=120)
+                res = requests.get(url,headers=self.headers,proxies={'http':self.proxies,'https':self.proxies},timeout=120)
             elif data and not self.proxies:
-                res = request.urlopen(Reqtype(url,headers=self.headers,method="POST",data=data),timeout=120)
+                # res = request.urlopen(Reqtype(url,headers=self.headers,method="POST",data=data),timeout=120)
+                res = requests.post(url,headers=self.headers,data=data,timeout=120)
+            elif json_data and not self.proxies:
+                # res = request.urlopen(Reqtype(url,headers=self.headers,method="POST",json=json),timeout=120)
+                res = requests.post(url,headers=self.headers,json=json_data,timeout=120)
             else:
-                res = request.urlopen(Reqtype(url,headers=self.headers,method="GET"),timeout=120)
+                # res = request.urlopen(Reqtype(url,headers=self.headers,method="GET"),timeout=120)
+                res = requests.get(url,headers=self.headers,timeout=120)
         except Exception as e:
             print("请求超时 请检查网络")
             print(e)
             # self.error_handle("ip可能被风控。请求地址: " + url)
         else:
-            if res.code != 200:
+            if res.status_code != 200:
                 self.error_handle("ip可能被风控，请求地址: " + url)
             if j:
-                return json.loads(res.read().decode("utf-8","ignore"))
+                return res.json()
             elif raw:
                 return res
             else:
-                return res.read().decode("utf-8","ignore")
+                return res.text
 
     def getCSRF(self):
         cookie = http.cookies.BaseCookie()
@@ -270,8 +282,7 @@ class Api:
             'requestSource': 'neul-next'
         }
         # payload = urlencode(payload)
-        payload = json.dumps(payload)
-        data = self._http(url,True,payload)
+        data = self._http(url,True,json_data=payload)
         
         # R.I.P. 旧滑块验证
 
@@ -299,8 +310,8 @@ class Api:
             if data["errno"] == -401:
                 print("=== 发现验证 ===")
                 __url = "https://api.bilibili.com/x/gaia-vgate/v1/register"
-                __payload = urlencode(data["data"]["ga_data"]["riskParams"])
-                __data = self._http(__url,True,__payload)
+                __payload = data["data"]["ga_data"]["riskParams"]
+                __data = self._http(__url,True,json_data=__payload)
                 if __data.get('data').get('type')=='geetest':
                     gt = __data["data"]["geetest"]["gt"]
                     challenge = __data["data"]["geetest"]["challenge"]
@@ -323,7 +334,7 @@ class Api:
                 else:
                     self.error_handle("验证码类别无法辨别，请重启程序后重试")
                 _url = "https://api.bilibili.com/x/gaia-vgate/v1/validate"
-                _data = self._http(_url,True,urlencode(_payload))
+                _data = self._http(_url,True,json_data=_payload)
                 if(_data["code"]==-111):
                     self.error_handle("csrf校验失败")
                 if _data["data"]["is_valid"] == 1:
@@ -390,7 +401,7 @@ class Api:
                     "deviceId": "",
                     "order_type": 1,
                     "pay_money": int(self.user_data["pay_money"]) * int(self.user_data["user_count"]),
-                    "project_id": self.user_data["project_id"],
+                    "project_id": int(self.user_data["project_id"]),
                     "screen_id": self.user_data["screen_id"],
                     "sku_id": self.user_data["sku_id"],
                     "timestamp": int(round(time.time() * 1000)),
@@ -399,12 +410,12 @@ class Api:
                 }
             else:
                 payload = {
-                    "buyer_info": self.user_data["buyer"],
+                    "buyer_info": json.dumps(self.user_data["buyer"]),
                     "count": self.user_data["user_count"],
                     "deviceId": "",
                     "order_type": 1,
                     "pay_money": int(self.user_data["pay_money"]) * int(self.user_data["user_count"]),
-                    "project_id": self.user_data["project_id"],
+                    "project_id": int(self.user_data["project_id"]),
                     "screen_id": self.user_data["screen_id"],
                     "sku_id": self.user_data["sku_id"],
                     "timestamp": int(round(time.time() * 1000)),
@@ -420,7 +431,7 @@ class Api:
                     "deviceId": "",
                     "order_type": 1,
                     "pay_money": int(self.user_data["pay_money"]) * int(self.user_data["user_count"]) + self.getExpressFee(),
-                    "project_id": self.user_data["project_id"],
+                    "project_id": int(self.user_data["project_id"]),
                     "screen_id": self.user_data["screen_id"],
                     "sku_id": self.user_data["sku_id"],
                     "timestamp": int(round(time.time() * 1000)),
@@ -430,12 +441,12 @@ class Api:
                 }
             else:
                 payload = {
-                    "buyer_info": self.user_data["buyer"],
+                    "buyer_info": json.dumps(self.user_data["buyer"]),
                     "count": self.user_data["user_count"],
                     "deviceId": "",
                     "order_type": 1,
                     "pay_money": int(self.user_data["pay_money"]) * int(self.user_data["user_count"]) + self.getExpressFee(),
-                    "project_id": self.user_data["project_id"],
+                    "project_id": int(self.user_data["project_id"]),
                     "screen_id": self.user_data["screen_id"],
                     "sku_id": self.user_data["sku_id"],
                     "timestamp": int(round(time.time() * 1000)),
@@ -444,7 +455,7 @@ class Api:
                     "again": 1
                 }
         timestr = time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())) + ' (LT)'
-        data = self._http(url,True,json.dumps(payload))
+        data = self._http(url,True,json_data=payload)
         if data:
             if data["errno"] == 0:
                 if self.checkOrder(data["data"]["token"],data["data"]["orderId"]):
@@ -454,11 +465,12 @@ class Api:
                     # + thisBuyerInfo + self.selectedTicketInfo + "\n"
                     # Add buyer info
                     if "buyer_info" in payload:
-                        for i in range(0, len(payload["buyer_info"])):
+                        buyer_info = json.loads(payload["buyer_info"])
+                        for i in range(0, len(buyer_info)):
                             if self.user_data["auth_type"] == 0:
-                                trayNotifyMessage += ['buyer_info'][i][0] + " "
+                                trayNotifyMessage += buyer_info[i][0] + " "
                             else:
-                                trayNotifyMessage += payload['buyer_info'][i]["name"] + " "
+                                trayNotifyMessage += buyer_info[i]["name"] + " "
                     elif "buyer" in payload:
                         trayNotifyMessage += payload["buyer"]
                     trayNotifyMessage += "\n" + self.selectedTicketInfo
@@ -540,8 +552,8 @@ class Api:
     def error_handle(self,msg):
         self.tray_notify("发生错误", msg, "./ico/failed.ico", timeout=120)
         print(msg)
-        os.system("pause")
-        sys.exit(0)
+        input("按下Enter / Return键继续……")
+        os._exit(0)
 
     def menu(self,mtype,data=None):
         if mtype == "GET_SHOW":
@@ -705,8 +717,9 @@ class Api:
                 # continue
             if self.orderCreate():
                 # open("url","w").write("https://show.bilibili.com/orderlist")
-                os.system("pause")
+                input("按下Enter / Return键继续……")
                 break
+        os._exit(0)
 
     def test(self):
         self.load_cookie()

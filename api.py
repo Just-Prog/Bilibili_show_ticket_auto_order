@@ -7,7 +7,7 @@ import os
 import time
 import re
 import json
-import sys
+import secrets
 import http.cookies
 import qrcode
 import bili_ticket_gt_python
@@ -60,6 +60,7 @@ class Api:
         self.selectedScreen = 0
         self.selectedTicket = 0
         self.validatePhoneNum = str(phone) if phone else str()
+        self.deviceFingerprint = secrets.token_hex(16)
         # ALL_USER_DATA_LIST = [""]
 
     def load_cookie(self):
@@ -120,8 +121,16 @@ class Api:
             print(e)
             # self.error_handle("ip可能被风控。请求地址: " + url)
         else:
-            if res.status_code != 200:
-                self.error_handle("ip可能被风控，请求地址: " + url)
+            if res.status_code == 429:
+                print("请求过多 " + url)
+                return
+            if res.status_code == 412:
+                self.error_handle("请求已被哔哩哔哩安全控制策略拒绝。(" + str(res.status_code) + "): " + url)
+            elif res.status_code != 200:
+                print("--------------------")
+                print(res.text)
+                print("--------------------")
+                self.error_handle("请求出现错误(" + str(res.status_code) + "): " + url + " 报文请参考执行窗口")
             if j:
                 return res.json()
             elif raw:
@@ -406,7 +415,7 @@ class Api:
                     "sku_id": self.user_data["sku_id"],
                     "timestamp": int(round(time.time() * 1000)),
                     "token": self.user_data["token"],
-                    "again": 1,
+                    "deviceId": self.deviceFingerprint
                 }
             else:
                 payload = {
@@ -420,7 +429,7 @@ class Api:
                     "sku_id": self.user_data["sku_id"],
                     "timestamp": int(round(time.time() * 1000)),
                     "token": self.user_data["token"],
-                    "again": 1
+                    "deviceId": self.deviceFingerprint
                 }
         else:
             if self.user_data["auth_type"] == 0:
@@ -437,7 +446,7 @@ class Api:
                     "timestamp": int(round(time.time() * 1000)),
                     "token": self.user_data["token"],
                     "deliver_info": json.dumps(self.user_data["deliver_info"],ensure_ascii=0),
-                    "again": 1
+                    "deviceId": self.deviceFingerprint
                 }
             else:
                 payload = {
@@ -452,7 +461,7 @@ class Api:
                     "timestamp": int(round(time.time() * 1000)),
                     "token": self.user_data["token"],
                     "deliver_info": json.dumps(self.user_data["deliver_info"],ensure_ascii=0),
-                    "again": 1
+                    "deviceId": self.deviceFingerprint
                 }
         timestr = time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())) + ' (LT)'
         data = self._http(url,True,json_data=payload)

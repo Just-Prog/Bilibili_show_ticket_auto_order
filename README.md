@@ -1,5 +1,7 @@
 # Bilibili_show_ticket_auto_order
 
+## 温馨提示：请不要将本程序使用于 `Bilibili World 2025` 与 `Bilibili Macro Link 2025`，由尝试行为产生的对出票失败/自动退票、账号/IP/设备封禁等处罚措施的触发以及数字资产/经济损失等与本程序无关，已尽告知义务。
+
 ## 本项目仅供Python编程学习、urllib/requests库网络请求操作学习、Selenium操作学习使用，请勿用于商业以及危害网站正常运行及数据安全用途
 
 ## 截止到 2024/11/15 仍然可用

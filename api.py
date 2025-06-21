@@ -156,7 +156,9 @@ class Api:
             return 1
         # print(self.menu("GET_ORDER_IF",data["data"]))
         self.setAuthType(data)
-
+        self.hotProject = data["data"]["hotProject"]
+        if data["data"]["pick_seat"] == 1:
+            self.error_handle("程序不支持需要选座的演出，请前往会员购手动操作。")
         # print(self.user_data["auth_type"])
         self.user_data["screen_id"],self.user_data["sku_id"],self.user_data["pay_money"],self.userCountLimit,self.deliveryType = self.menu("GET_ORDER_IF",data["data"])
         if(self.deliveryType != 1): # 临时判断法，其他的type不知道只指向什么
@@ -169,7 +171,7 @@ class Api:
         # print("订单信息获取成功")
     
     def getExpressFee(self):
-        url = "https://show.bilibili.com/api/ticket/project/get?version=134&id=" + self.user_data["project_id"] + "&project_id="+ self.user_data["project_id"]
+        url = "https://show.bilibili.com/api/ticket/project/getV2?version=134&id=" + self.user_data["project_id"] + "&project_id="+ self.user_data["project_id"]
         data = self._http(url,True)
         if data:
             if not data["data"]:

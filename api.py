@@ -167,7 +167,7 @@ class Api:
             fa = a["prov"]+a["city"]+a["area"]+a["addr"]
             self.user_data["deliver_info"] = {}
             self.user_data["deliver_info"]["name"],self.user_data["deliver_info"]["tel"],self.user_data["deliver_info"]["addr_id"],self.user_data["deliver_info"]["addr"] = a["name"],a["phone"],a["id"],fa
-
+        self.sale_start = data["data"]["screen_list"][self.selectedScreen]["ticket_list"][self.selectedTicket]['saleStart']
         # print("订单信息获取成功")
     
     def getExpressFee(self):
@@ -277,6 +277,13 @@ class Api:
             self.error_handle('请在配置文件中预留哔哩哔哩账号绑定的手机号。')
 
     def tokenGet(self):
+        time_s = self.sale_start
+        time_x = time.time()
+        if int(time_x) < (time_s+3):
+            print("未开票，正在等待 开票时间:", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time_s)), "请求发起时间:", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time_x)))
+            for i in range(time_s - int(time_x) - 1, 0, -1):
+                print("\r剩余时间：{}s".format(i), end="", flush=True)
+                time.sleep(1)
         # 获取token
         url = "https://show.bilibili.com/api/ticket/order/prepare?project_id=" + self.user_data["project_id"]
         payload = {
@@ -358,21 +365,7 @@ class Api:
                 else:
                     self.error_handle("验证失败。")
             elif data["errno"] == 100041:
-                # print("指定展览/演出未开票或账号异常")
-                url_ = "https://show.bilibili.com/api/ticket/project/getV2?version=134&id=" + self.user_data["project_id"] + "&project_id="+ self.user_data["project_id"] + "&requestSource=pc-new"
-                data_ = self._http(url_,True)
-                time_s = data_["data"]["screen_list"][self.selectedScreen]["ticket_list"][self.selectedTicket]['saleStart']
-                # time_x = time.time()
-                ntp_resp = ntplib.NTPClient().request('ntp.aliyun.com')
-                time_x = ntp_resp.tx_time - ntp_resp.offset
-                # if int(time.time()) < time_s:
-                if int(time_x) < (time_s-1):
-                    print("未开票，正在等待 开票时间:", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time_s)), "请求发起时间:", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time_x)))
-                    for i in range(time_s - int(time_x) - 1, 0, -1):
-                        print("\r剩余时间：{}s".format(i), end="", flush=True)
-                        time.sleep(1)
-                else:
-                    self.error_handle("账号状态异常，请检查您的哔哩哔哩账号")
+                self.error_handle("账号状态异常，请检查您的哔哩哔哩账号")
             elif data['errno'] == 100098:
                 self.error_handle('当前票种/展览/演出设定状态为为哔哩哔哩大会员限定购买，如已是大会员请确认大会员权能是否冻结')
             elif data['errno'] == 100039:
@@ -380,7 +373,7 @@ class Api:
             else:
                 if not data["data"]:
                     timestr = time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())) + ":"
-                    print(timestr,"失败信息: ",data["code"],data["msg"])
+                    print(timestr,"失败信息: ",data["errno"],data["msg"])
                     return 1
                 if data["data"]["token"]:
                     self.user_data["token"] = data["data"]["token"]

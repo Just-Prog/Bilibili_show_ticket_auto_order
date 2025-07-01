@@ -7,19 +7,15 @@ import os
 import time
 import re
 import json
+import random
 import secrets
 import http.cookies
 import qrcode
 import bili_ticket_gt_python
-import ntplib
 from time import sleep
-from urllib import request
-from urllib.request import Request as Reqtype
 from urllib.parse import urlencode
 import requests
 from plyer import notification as trayNotify
-
-
 
 class Api:
     """
@@ -30,7 +26,7 @@ class Api:
         self.specificID=specificID
         self.headers = {
             # "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 11.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
             "Referer":"https://show.bilibili.com/",
             "Origin":"https://show.bilibili.com/",
             "Pregma":"no-cache",
@@ -39,7 +35,7 @@ class Api:
             "Sec-Fetch-Mode":"navigate",
             "Sec-Fetch-User":"?1",
             "Sec-Fetch-Dest":"document",
-            "Cookie":"a=b;",
+            "Cookie":"",
             "Accept": "*/*",
             "Accept-Language": "zh-CN,zh;q=0.9",
             "Accept-Encoding": "",
@@ -47,6 +43,7 @@ class Api:
         }
         self.sleepTime = sleepTime
         self.token = token
+        self.hotProject = False
         self.start_time = time.time()
         self.user_data = {}
         self.user_data["specificID"] = specificID
@@ -59,6 +56,7 @@ class Api:
         self.userCountLimit = ""
         self.selectedScreen = 0
         self.selectedTicket = 0
+        self.expressFee = 0
         self.validatePhoneNum = str(phone) if phone else str()
         self.deviceFingerprint = secrets.token_hex(16)
         # ALL_USER_DATA_LIST = [""]
@@ -90,8 +88,9 @@ class Api:
                 j = j[list(j.keys())[0]]
                 self.user_data["username"],self.headers["Cookie"] = j[0],j[1]
         print("您登录的账号UID为: ",self.user_data["username"])
+        self.buvid3, self.buvid4 = self.buvid3_gen()
+        self.headers['Cookie'] += "buvid3={}; buvid4={}; ".format(self.buvid3,self.buvid4)
 
-            
     def _http(self,url,j=False,data=None,raw=False,json_data=None):
         data = data.encode() if type(data) == type("") else data
         try:
@@ -138,6 +137,11 @@ class Api:
             else:
                 return res.text
 
+    def buvid3_gen(self):
+        url = "https://api.bilibili.com/x/frontend/finger/spi"
+        resp = self._http(url,True)
+        return resp["data"]["b_3"], resp["data"]["b_4"]
+
     def getCSRF(self):
         cookie = http.cookies.BaseCookie()
         cookie.load(self.headers["Cookie"])
@@ -170,16 +174,7 @@ class Api:
         self.sale_start = data["data"]["screen_list"][self.selectedScreen]["ticket_list"][self.selectedTicket]['saleStart']
         # print("订单信息获取成功")
     
-    def getExpressFee(self):
-        url = "https://show.bilibili.com/api/ticket/project/getV2?version=134&id=" + self.user_data["project_id"] + "&project_id="+ self.user_data["project_id"]
-        data = self._http(url,True)
-        if data:
-            if not data["data"]:
-                print(data)
-                return 1
-        else:
-            return 0
-        e = data["data"]["express_fee"]
+    def getExpressFee(self, e):
         if(e == -1 or e == -2):
             return 0
         return e
@@ -377,6 +372,9 @@ class Api:
                     return 1
                 if data["data"]["token"]:
                     self.user_data["token"] = data["data"]["token"]
+                    if self.hotProject:
+                        self.user_data['ctoken'] = ""   # 没扒完
+                        self.user_data['ptoken'] = data["data"]["ptoken"]
         return 0
         
     def orderCreate(self):
@@ -392,73 +390,40 @@ class Api:
 
         # 创建订单
         # url = "https://show.bilibili.com/api/ticket/order/createV2?project_id=" + config["projectId"]
-        url = "https://show.bilibili.com/api/ticket/order/createV2?project_id=" + self.user_data["project_id"]
-
-        try:
-            self.user_data["deliver_info"]
-        except KeyError:
-            if self.user_data["auth_type"] == 0:
-                payload = {
-                    "buyer": self.user_data["buyer_name"],
-                    "tel": self.user_data["buyer_phone"],
-                    "count": self.user_data["user_count"],
-                    "deviceId": "",
-                    "order_type": 1,
-                    "pay_money": int(self.user_data["pay_money"]) * int(self.user_data["user_count"]),
-                    "project_id": int(self.user_data["project_id"]),
-                    "screen_id": self.user_data["screen_id"],
-                    "sku_id": self.user_data["sku_id"],
-                    "timestamp": int(round(time.time() * 1000)),
-                    "token": self.user_data["token"],
-                    "deviceId": self.deviceFingerprint
-                }
-            else:
-                payload = {
-                    "buyer_info": json.dumps(self.user_data["buyer"]),
-                    "count": self.user_data["user_count"],
-                    "deviceId": "",
-                    "order_type": 1,
-                    "pay_money": int(self.user_data["pay_money"]) * int(self.user_data["user_count"]),
-                    "project_id": int(self.user_data["project_id"]),
-                    "screen_id": self.user_data["screen_id"],
-                    "sku_id": self.user_data["sku_id"],
-                    "timestamp": int(round(time.time() * 1000)),
-                    "token": self.user_data["token"],
-                    "deviceId": self.deviceFingerprint
-                }
+        url = "https://show.bilibili.com/api/ticket/order/createV2?project_id={}".format(self.user_data["project_id"])
+        payload = {
+            "count": int(self.user_data["user_count"]),
+            "order_type": 1,
+            "pay_money": int(self.user_data["pay_money"]) * int(self.user_data["user_count"]) + int(self.expressFee),
+            "project_id": int(self.user_data["project_id"]),
+            "screen_id": self.user_data["screen_id"],
+            "sku_id": self.user_data["sku_id"],
+            "timestamp": int(round(time.time() * 1000)),
+            "token": self.user_data["token"],
+            "deviceId": self.deviceFingerprint,
+            "requestSource": "neul-next",
+            "newRisk": True,                # wtf is this
+            "clickPosition": {              # wtf is this either
+                "x": random.randrange(200,800),
+                "y": random.randrange(200,800),
+                "origin": (int(time.time()) - random.randrange(1,5)) * 1000,
+                "now": int(time.time()) * 1000
+            },
+        }
+        if self.user_data["auth_type"] == 0:
+            payload['buyer'] = self.user_data["buyer_name"]
+            payload['tel'] = self.user_data["buyer_phone"]
         else:
-            if self.user_data["auth_type"] == 0:
-                payload = {
-                    "buyer": self.user_data["buyer_name"],
-                    "tel": self.user_data["buyer_phone"],
-                    "count": self.user_data["user_count"],
-                    "deviceId": "",
-                    "order_type": 1,
-                    "pay_money": int(self.user_data["pay_money"]) * int(self.user_data["user_count"]) + self.getExpressFee(),
-                    "project_id": int(self.user_data["project_id"]),
-                    "screen_id": self.user_data["screen_id"],
-                    "sku_id": self.user_data["sku_id"],
-                    "timestamp": int(round(time.time() * 1000)),
-                    "token": self.user_data["token"],
-                    "deliver_info": json.dumps(self.user_data["deliver_info"],ensure_ascii=0),
-                    "deviceId": self.deviceFingerprint
-                }
-            else:
-                payload = {
-                    "buyer_info": json.dumps(self.user_data["buyer"]),
-                    "count": self.user_data["user_count"],
-                    "deviceId": "",
-                    "order_type": 1,
-                    "pay_money": int(self.user_data["pay_money"]) * int(self.user_data["user_count"]) + self.getExpressFee(),
-                    "project_id": int(self.user_data["project_id"]),
-                    "screen_id": self.user_data["screen_id"],
-                    "sku_id": self.user_data["sku_id"],
-                    "timestamp": int(round(time.time() * 1000)),
-                    "token": self.user_data["token"],
-                    "deliver_info": json.dumps(self.user_data["deliver_info"],ensure_ascii=0),
-                    "deviceId": self.deviceFingerprint
-                }
+            payload['buyer_info'] = json.dumps(self.user_data["buyer"]),
+        if self.deliveryType != 1:
+            payload['deliver_info'] = json.dumps(self.user_data["deliver_info"],ensure_ascii=0)
+        if self.hotProject:
+            payload["ptoken"] = self.user_data["ptoken"]
+            # payload["ctoken"] = ""
+            payload["orderCreateUrl"] = "https://show.bilibili.com/api/ticket/order/createV2"
+            url += "&ptoken={}".format(self.user_data["ptoken"])
         timestr = time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())) + ' (LT)'
+        self.headers['X-Risk-Header'] = "platform/pc uid/{} deviceId/{}".format(self.user_data['username'],self.buvid3)
         data = self._http(url,True,json_data=payload)
         if data:
             if data["errno"] == 0:
@@ -602,6 +567,7 @@ class Api:
             print("\n已选择：", self.selectedTicketInfo)
             self.selectedScreen = date
             self.selectedTicket = choice
+            self.expressFee = self.getExpressFee(data["screen_list"][date]['express_fee'])
             return data["screen_list"][date]["id"],data["screen_list"][date]["ticket_list"][choice]["id"],data["screen_list"][date]["ticket_list"][choice]["price"],data["screen_list"][date]["ticket_list"][choice]["static_limit"]["num"],data["screen_list"][date]['delivery_type']
         elif mtype == "GET_ID_INFO":
             if not data:

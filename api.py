@@ -500,13 +500,31 @@ class Api:
         url = "https://show.bilibili.com/api/ticket/order/createstatus?token="+_token+"&timestamp="+str(int(round(time.time() * 1000)))+"&project_id="+self.user_data["project_id"]+"&orderId="+str(_orderId)
         data = self._http(url,True)
         if(data["errno"] == 0):
-            _qrcode = data["data"]["payParam"]["code_url"]
+            _qrcode = str()
+            try:
+                _qrcode = data["data"]["payParam"]["code_url"]
+            except:
+                try:
+                    payParam_backup = "https://show.bilibili.com/api/ticket/order/getPayParam?order_id=" + str(_orderId)
+                    _data = self._http(payParam_backup, True)
+                    if _data["errno"] == 0:
+                        _qrcode = data["data"]["code_url"]
+                    else:
+                        raise ValueError
+                except:
+                    print()
+                    print("!!! 二维码获取失败，请手动从会员购订单管理页支付 !!!")
+                    print()
+                    return 1
+            print()
             print("请使用微信/QQ/支付宝扫描二维码完成支付")
             print("请使用微信/QQ/支付宝扫描二维码完成支付")
-            print("请使用微信/QQ/支付宝扫描二维码完成支付\n")
+            print("请使用微信/QQ/支付宝扫描二维码完成支付")
+            print()
             print(f"若二维码显示异常请扫描程序目录下 ticket_{str(_orderId)}.png 图片文件的二维码")
             print(f"若二维码显示异常请扫描程序目录下 ticket_{str(_orderId)}.png 图片文件的二维码")
             print(f"若二维码显示异常请扫描程序目录下 ticket_{str(_orderId)}.png 图片文件的二维码")
+            print()
             _ts = time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))
             qr_gen = qrcode.QRCode()
             qr_gen.add_data(_qrcode)
@@ -514,6 +532,7 @@ class Api:
             qr_gen.make_image().save(f'ticket_{str(_orderId)}.png')
             # print(qrcode)
             print(f'\n二维码生成时间：{_ts}')
+            print()
             return 1
         else:
             return 0
